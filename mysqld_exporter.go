@@ -14,13 +14,14 @@ import (
 	"gopkg.in/ini.v1"
 
 	"github.com/prometheus/mysqld_exporter/collector"
+	"net"
 )
 
 var (
 	listenAddress = kingpin.Flag(
-		"web.listen-address",
-		"Address to listen on for web interface and telemetry.",
-	).Default(":9104").String()
+		"unix-sock",
+		"Address to listen on for unix sock access and telemetry.",
+	).Default("/dev/shm/mysqld_exporter.sock").String()
 	metricPath = kingpin.Flag(
 		"web.telemetry-path",
 		"Path under which to expose metrics.",
@@ -251,11 +252,22 @@ func main() {
 		}
 	}
 
-	http.HandleFunc(*metricPath, prometheus.InstrumentHandlerFunc("metrics", handler))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(landingPage)
-	})
-
 	log.Infoln("Listening on", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+
+	mux := http.NewServeMux()
+	mux.HandleFunc(*metricPath, prometheus.InstrumentHandlerFunc("metrics", handler))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(landingPage)
+	})
+	server := http.Server{
+		Handler: mux, // http.DefaultServeMux,
+	}
+	os.Remove(*listenAddress)
+
+	listener, err := net.Listen("unix", *listenAddress)
+	if err != nil {
+		panic(err)
+	}
+	server.Serve(listener)
 }
