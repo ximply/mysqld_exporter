@@ -252,9 +252,6 @@ func main() {
 		}
 	}
 
-	log.Infoln("Listening on", *listenAddress)
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
-
 	mux := http.NewServeMux()
 	mux.HandleFunc(*metricPath, prometheus.InstrumentHandlerFunc("metrics", handler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
